@@ -1,7 +1,6 @@
 import machine
 from time import sleep
 
-
 class SHT40:
     # yellow -> SCL
     # Blue -> SDA
@@ -15,8 +14,8 @@ class SHT40:
     READ_SERIAL_NUM = 0x89
     SOFT_RESET=0x94
 
-    def __init__(self,SCL = machine.Pin(9),SDA = machine.Pin(8)):
-        self.i2c = machine.I2C(0, scl = SCL, sda = SDA)
+    def __init__(self,i2c_bus):
+        self.i2c = i2c_bus
         self.write_to_device(SHT40.SOFT_RESET)
 
     def write_to_device(self,cmd):
@@ -46,7 +45,7 @@ class SHT40:
         humid = self.raw_to_rumidity(raw_humid)
         
         print('Temperature: {temp}C, Humidity: {humid} %RH'.format(temp = temp, humid = humid))
-        return temp,humid
+        return dict(temp=temp,humid=humid)
 
     def raw_to_rumidity(self,raw):
         return - 6 + 125 * raw/(2**16 - 1)
@@ -56,11 +55,15 @@ class SHT40:
 
 
 if __name__ =='__main__':
-    h=SHT40()
+    SCL = machine.Pin(9)
+    SDA = machine.Pin(8)
+    i2c_bus = machine.I2C(0, scl = SCL, sda = SDA) 
+    h=SHT40(i2c_bus)
     led = machine.Pin("LED", machine.Pin.OUT)
     while True:
         led.value(True)
         print('Fetching Measurements')
-        temp,humid = h.get_measurements()
+        data = h.get_measurements()
+        print(f'Temperature: {data.get("temp")}C, Humidity: {data.get("humid")} %RH')
         led.value(False)
         sleep(5)
