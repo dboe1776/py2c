@@ -6,11 +6,11 @@ import machine
 # from sensors.SHT40 import SHT40
 from sensors.TMP117 import TMP117
 
-SSID = ''
-PASSWORD = ''
+SSID = ''                         # Set SSID
+PASSWORD = ''                     # Set password
 TIMEOUT = 30
 ID = machine.unique_id().hex()
-hostname = 'localhost'
+hostname = 'localhost'            # Set hostname 
 
 endpoint = 'http://{hostname}:5000/api/sensor-data'.format(hostname = hostname)
 
