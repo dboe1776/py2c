@@ -1,9 +1,5 @@
 """
-Main script for measuring and transmiting data from a sensor.
-
-SAMPLE .json sent by this program:
-    {'sensor_data': {'temp': 19.59375}, 'host': 'e6614864d32c8c36'}
-    {'sensor_data': {'temp': 13.48471,'humidity':46.39872}, 'host': 'e6614864d32d8a41'},
+Same as main.py except script attempts to calibrate the Pico clock to real time using an API.
 """
 
 import json
@@ -11,18 +7,17 @@ import urequests
 import network
 import time
 import machine
-import config
 # from sensors.SHT40 import SHT40
 from sensors.TMP117 import TMP117
 
-
-SSID = config.SSID                   # Set SSID
-PASSWORD = config.PASSWORD           # Set password
+SSID = ''                         # Set SSID
+PASSWORD = ''                     # Set password
 TIMEOUT = 30
 ID = machine.unique_id().hex()
-HOSTNAME = config.HOSTNAME 
-PORT=config.PORT
-endpoint = config.ENDPOINT
+hostname = 'localhost'            # Set hostname 
+
+endpoint = 'http://{hostname}:5000/api/sensor-data'.format(hostname = hostname)
+
 
 def wait_for_wifi(wlan,timeout):
     conn_start = time.time()
@@ -33,16 +28,42 @@ def wait_for_wifi(wlan,timeout):
             break 
         else:
             print('Waiting for Connection')
-            time.sleep(1)
+            time.sleep(2)
     return wlan.isconnected()
 
 def establish_connection(wlan):
     wifi_status = False
+    time_status = False
 
-    wifi_status = wait_for_wifi(wlan,TIMEOUT)
-    while (not wifi_status):
-        time.sleep(60)
+    while (not wifi_status) and (not time_status):
         wifi_status = wait_for_wifi(wlan,TIMEOUT)
+        time.sleep(1)
+        time_status = calibrate_time()
+        if wifi_status and time_status:
+            break
+        else:
+            # wait for a bit and then try again.
+            time.sleep(60)
+
+def calibrate_time():
+    print('Attempting to calibrate time')
+    try:
+        response = urequests.get("http://worldtimeapi.org/api/ip")
+        date = response.json()['utc_datetime'].split('T')[0].split('-')
+        date = [int(x) for x in date]
+        date.append(0)
+        time_ = response.json()['utc_datetime'].split('T')[-1].split('.')[0]
+        time_ = time_.split(':')
+        time_ = [int(x) for x in time_]
+        time_.append(0)
+        overall = tuple(date + time_)
+        print('Setting Time to {timetuple}'.format(timetuple = overall))
+        machine.RTC().datetime(overall)
+        print('Time calibrated')
+        return True
+    except Exception as ex:
+        print('Time calibration failed')
+        return False
     
 #####################################
 ## Program
@@ -65,7 +86,7 @@ while True:
     if not wlan.isconnected():
         wait_for_wifi()
     data = sensor.get_measurements()
-    data = {'host':ID,'sensor_data':data}
+    data = {'host':ID,'tmeas':time.time(),'sensor_data':data}
     packet = json.dumps(data)
     print(packet)
     try:
