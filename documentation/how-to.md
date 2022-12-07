@@ -28,6 +28,6 @@
 7. Next, from within the _microPython/sensors_ directory in this repo, copy and paste the contents of _TMP117.py_ into a new file in Thonny.  
 8. Save this file to the _sensors_ folder on the Pico as _TMP117.py_ 
 9. Create a new file in the root directory of the pico called _config.py_
-10. Copy and paste the contents from _config.py_ of this repository to the _config.py_ file on the pico.
+10. Copy and paste the contents from *config_template.py* of this repository to the _config.py_ file on the pico.
 11. Populate the variables in the Pico's _config.py_ file with the correct values (e.g., set _SSID_ and _PASSWORD_ to the correct wi-fi credentials).  
 12. Finally, copy  _main.py_ onto the root directory of the Pico. 
