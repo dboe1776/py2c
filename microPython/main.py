@@ -23,27 +23,35 @@ ID = machine.unique_id().hex()
 HOSTNAME = config.HOSTNAME 
 PORT=config.PORT
 endpoint = config.ENDPOINT
+led = machine.Pin("LED", machine.Pin.OUT)
+led.off()
 
 def wait_for_wifi(wlan,timeout):
     conn_start = time.time()
 
     while (time.time() - conn_start) < timeout:
+        led.toggle()
         if wlan.isconnected() and wlan.status() >=3:
-            print('Connection Succesful')
+            print('Connection Successful')
             break 
         else:
             print('Waiting for Connection')
             time.sleep(1)
+    led.off()
     return wlan.isconnected()
 
-def establish_connection(wlan):
-    wifi_status = False
-
-    wifi_status = wait_for_wifi(wlan,TIMEOUT)
-    while (not wifi_status):
-        time.sleep(60)
-        wifi_status = wait_for_wifi(wlan,TIMEOUT)
+def establish_connection(wlan,max_tries = 2):
+    led.off()
+    tries = 0
+    while (not wait_for_wifi(wlan,TIMEOUT)):
+        tries+=1
+        if tries < max_tries:
+            time.sleep(30)
+        else:
+            print('Unable to connect after {n} tries... resetting'.format(n=tries))
+            machine.reset()
     
+    led.on()
 #####################################
 ## Program
 #####################################
@@ -62,22 +70,23 @@ i2c_bus = machine.I2C(0, scl = SCL, sda = SDA)
 sensor  = TMP117(i2c_bus)
 
 while True:
-    if not wlan.isconnected():
-        wait_for_wifi()
+    if wlan.status() <3:
+        establish_connection()
     data = sensor.get_measurements()
     data = {'host':ID,'sensor_data':data}
     packet = json.dumps(data)
     print(packet)
+    failed = False
     try:
         r = urequests.post(endpoint,json = packet)
     except Exception as ex:
         print('Data Post Failed',ex)
+        failed = True
     try:
-        if r.status_code == 200:
+        if (r.status_code == 200) and not failed:
             print('Data post successful')
         r.close()
     except Exception as ex:
         print('No response object')
-    
-    time.sleep(300)
 
+    time.sleep(config.DELAY)
