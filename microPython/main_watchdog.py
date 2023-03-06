@@ -26,10 +26,13 @@ endpoint = config.ENDPOINT
 led = machine.Pin("LED", machine.Pin.OUT)
 led.off()
 
+WATCHDOG = machine.WDT(timeout=8000)
+
 def wait_for_wifi(wlan,timeout):
     conn_start = time.time()
 
     while (time.time() - conn_start) < timeout:
+        WATCHDOG.feed()
         led.toggle()
         if wlan.isconnected() and wlan.status() >=3:
             print('Connection Successful')
@@ -46,7 +49,10 @@ def establish_connection(wlan,max_tries = 2):
     while (not wait_for_wifi(wlan,TIMEOUT)):
         tries+=1
         if tries < max_tries:
-            time.sleep(30)
+            ref_time = time.time()
+            while time.time() - ref_time < 30:
+                WATCHDOG.feed()
+                time.sleep(1)
         else:
             print('Unable to connect after {n} tries... resetting'.format(n=tries))
             machine.reset()
@@ -66,17 +72,24 @@ establish_connection(wlan)
 SCL = machine.Pin(9)
 SDA = machine.Pin(8)
 i2c_bus = machine.I2C(0, scl = SCL, sda = SDA) 
-# sensor = SHT40.SHT40(i2c_bus)
-sensor  = TMP117(i2c_bus,address=0x49)
+
+sensor1  = TMP117(i2c_bus,address=0x49)
+sensor2  = TMP117(i2c_bus)
 
 try:
     while True:
         if not wlan.isconnected():
             establish_connection()
-        data = sensor.get_measurements()
-        data = {'device_id':ID,'measurements':data}
-        # packet = json.dumps(data)  
-        packet = data   ## Uncomment when using Fast api endpoint
+        data1 = sensor1.get_measurements()
+        data1 = {k+'_1':v for k,v in data1.items()}
+        time.sleep(0.01)
+        data2 = sensor2.get_measurements()
+        data2 = {k+'_2':v for k,v in data2.items()}
+        
+        data1.update(data2)
+
+        packet = {'device_id':ID,'measurements':data1}
+        # packet = json.dumps(data)
         print(packet)
         failed = False
         try:
@@ -84,7 +97,7 @@ try:
         except Exception as ex:
             print('Data Post Failed',ex)
             failed = True
-            n_fails +=1
+            n_fails+=1
         try:
             if (r.status_code == 200) and not failed:
                 print('Data post successful')
@@ -95,6 +108,11 @@ try:
         if n_fails >= config.N_FAILS:
             print('Too many failures, restarting')
             machine.reset()
-        time.sleep(config.DELAY)
+        WATCHDOG.feed()
+
+        ref_time = time.time()
+        while time.time() - ref_time < config.DELAY:
+            WATCHDOG.feed()
+            time.sleep(1)
 except Exception as ex:
     machine.reset()

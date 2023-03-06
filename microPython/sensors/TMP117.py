@@ -14,8 +14,6 @@ class TMP117:
     # yellow -> SCL
     # Blue -> SDA
 
-    ADDRESS=0x48
-
     # Commands
     
     TEMP_REGISTER = 0x00
@@ -25,18 +23,19 @@ class TMP117:
     TEMP_RESET = 0x8000
     SOFT_RESET = 0x0002
 
-    def __init__(self,i2c):
+    def __init__(self,i2c,address = 0x48):
+        self.ADDRESS=address
         self.i2c = i2c
 
     def write_to_register(self,reg,cmd):
         print('Writing {cmd} to device on register {reg}'.format(cmd = cmd,reg = reg))
-        self.i2c.writeto_mem(TMP117.ADDRESS,reg,bytes([cmd]))
+        self.i2c.writeto_mem(self.ADDRESS,reg,bytes([cmd]))
         sleep(0.1)  
 
     def read_from_register(self,reg,n_bytes = 2):
         print('Reading from register {reg}'.format(reg = reg))
         bytes_read = bytearray(n_bytes)
-        self.i2c.readfrom_mem_into(TMP117.ADDRESS,reg,bytes_read)
+        self.i2c.readfrom_mem_into(self.ADDRESS,reg,bytes_read)
         sleep(0.1)  
         return bytes_read
 

@@ -15,7 +15,7 @@ import config
 # from sensors.SHT40 import SHT40
 from sensors.TMP117 import TMP117
 
-n_fails=0
+
 SSID = config.SSID                   # Set SSID
 PASSWORD = config.PASSWORD           # Set password
 TIMEOUT = 30
@@ -63,38 +63,41 @@ wlan.connect(SSID,PASSWORD)
 # stay here till we have a connection
 establish_connection(wlan)
 
-SCL = machine.Pin(9)
-SDA = machine.Pin(8)
-i2c_bus = machine.I2C(0, scl = SCL, sda = SDA) 
-# sensor = SHT40.SHT40(i2c_bus)
-sensor  = TMP117(i2c_bus,address=0x49)
+SCL_1 = machine.Pin(9)
+SDA_1 = machine.Pin(8)
+i2c_bus_1 = machine.I2C(0, scl = SCL_1, sda = SDA_1) 
+sensor1  = TMP117(i2c_bus_1)
 
-try:
-    while True:
-        if not wlan.isconnected():
-            establish_connection()
-        data = sensor.get_measurements()
-        data = {'device_id':ID,'measurements':data}
-        # packet = json.dumps(data)  
-        packet = data   ## Uncomment when using Fast api endpoint
-        print(packet)
-        failed = False
-        try:
-            r = urequests.post(endpoint,json = packet,timeout=5)
-        except Exception as ex:
-            print('Data Post Failed',ex)
-            failed = True
-            n_fails +=1
-        try:
-            if (r.status_code == 200) and not failed:
-                print('Data post successful')
-            r.close()
-        except Exception as ex:
-            print('No response object')
-        print('{} of {} allowed fails'.format(n_fails,config.N_FAILS))
-        if n_fails >= config.N_FAILS:
-            print('Too many failures, restarting')
-            machine.reset()
-        time.sleep(config.DELAY)
-except Exception as ex:
-    machine.reset()
+SCL_2 = machine.Pin(7)
+SDA_2 = machine.Pin(6)
+i2c_bus_2 = machine.I2C(1, scl = SCL_2, sda = SDA_2) 
+sensor2  = TMP117(i2c_bus_2)
+
+while True:
+    if wlan.status() <3:
+        establish_connection()
+    data1 = sensor1.get_measurements()
+    data1 = {k+'_1':v for k,v in data1.items()}
+    time.sleep(0.01)
+    data2 = sensor2.get_measurements()
+    data2 = {k+'_2':v for k,v in data2.items()}
+    
+    data1.update(data2)
+
+    data = {'host':ID,'sensor_data':data1}
+    packet = json.dumps(data)
+    print(packet)
+    failed = False
+    try:
+        r = urequests.post(endpoint,json = packet)
+    except Exception as ex:
+        print('Data Post Failed',ex)
+        failed = True
+    try:
+        if (r.status_code == 200) and not failed:
+            print('Data post successful')
+        r.close()
+    except Exception as ex:
+        print('No response object')
+
+    time.sleep(config.DELAY)
